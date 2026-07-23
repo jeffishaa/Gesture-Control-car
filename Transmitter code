@@ -1,0 +1,81 @@
+#include <WiFi.h>
+#include <esp_now.h>
+#include <Wire.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+
+Adafruit_MPU6050 mpu;
+
+// Replace with Receiver ESP32 MAC Address
+uint8_t receiverMAC[] = {0x24, 0x6F, 0x28, 0xAA, 0xBB, 0xCC};
+
+typedef struct {
+  char command[10];
+} Message;
+
+Message data;
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  Wire.begin();
+
+  if (!mpu.begin()) {
+    Serial.println("MPU6050 not found!");
+    while (1);
+  }
+
+  Serial.println("MPU6050 Initialized");
+
+  WiFi.mode(WIFI_STA);
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW Init Failed");
+    return;
+  }
+
+  esp_now_register_send_cb(OnDataSent);
+
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, receiverMAC, 6);
+  peerInfo.channel = 0;
+  peerInfo.encrypt = false;
+
+  esp_now_add_peer(&peerInfo);
+}
+
+void loop() {
+
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  float x = a.acceleration.x;
+  float y = a.acceleration.y;
+
+  if (y > 5) {
+    strcpy(data.command, "FORWARD");
+  }
+  else if (y < -5) {
+    strcpy(data.command, "BACK");
+  }
+  else if (x > 5) {
+    strcpy(data.command, "RIGHT");
+  }
+  else if (x < -5) {
+    strcpy(data.command, "LEFT");
+  }
+  else {
+    strcpy(data.command, "STOP");
+  }
+
+  esp_now_send(receiverMAC, (uint8_t *)&data, sizeof(data));
+
+  Serial.println(data.command);
+
+  delay(100);
+}
