@@ -1,0 +1,100 @@
+#include <WiFi.h>
+#include <esp_now.h>
+
+// Motor Driver Pins
+#define IN1 26
+#define IN2 27
+#define IN3 14
+#define IN4 12
+
+typedef struct {
+  char command[10];
+} Message;
+
+Message data;
+
+void stopMotor() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
+
+void forward() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+
+void backward() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+}
+
+void left() {
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+
+void right() {
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+}
+
+void OnDataRecv(const esp_now_recv_info_t *recv_info, const uint8_t *incomingData, int len) {
+
+  memcpy(&data, incomingData, sizeof(data));
+
+  Serial.print("Command: ");
+  Serial.println(data.command);
+
+  if (strcmp(data.command, "FORWARD") == 0)
+    forward();
+
+  else if (strcmp(data.command, "BACK") == 0)
+    backward();
+
+  else if (strcmp(data.command, "LEFT") == 0)
+    left();
+
+  else if (strcmp(data.command, "RIGHT") == 0)
+    right();
+
+  else
+    stopMotor();
+}
+
+void setup() {
+
+  Serial.begin(115200);
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+
+  stopMotor();
+
+  WiFi.mode(WIFI_STA);
+
+  Serial.print("Receiver MAC Address: ");
+  Serial.println(WiFi.macAddress());
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW Init Failed");
+    return;
+  }
+
+  esp_now_register_recv_cb(OnDataRecv);
+}
+
+void loop() {
+
+}
